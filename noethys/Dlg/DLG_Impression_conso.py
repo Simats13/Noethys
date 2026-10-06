@@ -554,10 +554,13 @@ class Page_Activites(wx.Panel):
         self.label_saut_activites = wx.StaticText(self, -1, _(u"Sauts de page :"))
         self.checkbox_saut_activites = wx.CheckBox(self, -1, _(u"Après l'activité"))
         self.checkbox_saut_groupes = wx.CheckBox(self, -1, _(u"Après le groupe"))
+        self.checkbox_masquer_vides = wx.CheckBox(self, -1, _(u"Masquer si vide"))
+        self.checkbox_masquer_vides.SetValue(True)
         
         # Propriétés
         self.checkbox_saut_activites.SetToolTip(wx.ToolTip(_(u"Cochez cette case pour insérer un saut de page après chaque activité")))
         self.checkbox_saut_groupes.SetToolTip(wx.ToolTip(_(u"Cochez cette case pour insérer un saut de page après chaque groupe")))
+        self.checkbox_masquer_vides.SetToolTip(wx.ToolTip(_(u"Cochez cette case pour ne pas imprimer les activités et groupes sans aucun individu (0 individu)")))
         self.ctrl_cocher = CTRL_Cocher(self, ctrl_liste=self.ctrl_activites)
 
         # Layout
@@ -566,13 +569,14 @@ class Page_Activites(wx.Panel):
         
         grid_sizer_base.Add(self.ctrl_activites, 1, wx.EXPAND, 0)
         
-        grid_sizer_options = wx.FlexGridSizer(rows=1, cols=5, vgap=2, hgap=5)
+        grid_sizer_options = wx.FlexGridSizer(rows=1, cols=6, vgap=2, hgap=5)
         grid_sizer_options.Add(self.label_saut_activites, 0, wx.ALIGN_CENTER_VERTICAL, 0)
         grid_sizer_options.Add(self.checkbox_saut_activites, 0, wx.ALIGN_CENTER_VERTICAL, 0)
         grid_sizer_options.Add(self.checkbox_saut_groupes, 0, wx.ALIGN_CENTER_VERTICAL, 0)
+        grid_sizer_options.Add(self.checkbox_masquer_vides, 0, wx.ALIGN_CENTER_VERTICAL, 0)
         grid_sizer_options.Add( (5, 5), 0, wx.ALIGN_CENTER_VERTICAL, 0)
         grid_sizer_options.Add(self.ctrl_cocher, 0, wx.ALIGN_CENTER_VERTICAL, 0)
-        grid_sizer_options.AddGrowableCol(3)
+        grid_sizer_options.AddGrowableCol(4)
         grid_sizer_base.Add(grid_sizer_options, 1, wx.EXPAND, 0)
 
         grid_sizer_base.AddGrowableRow(0)
@@ -585,15 +589,18 @@ class Page_Activites(wx.Panel):
         dictParametres = {}
         dictParametres["saut_activites"] = int(self.checkbox_saut_activites.GetValue())
         dictParametres["saut_groupes"] = int(self.checkbox_saut_groupes.GetValue())
+        dictParametres["masquer_vides"] = self.checkbox_masquer_vides.GetValue()
         return dictParametres
 
     def SetParametres(self, dictParametres={}):
         if dictParametres == None :
             self.checkbox_saut_activites.SetValue(True)
             self.checkbox_saut_groupes.SetValue(True)
+            self.checkbox_masquer_vides.SetValue(True)
         else :
             if "saut_activites" in dictParametres : self.checkbox_saut_activites.SetValue(dictParametres["saut_activites"])
             if "saut_groupes" in dictParametres : self.checkbox_saut_groupes.SetValue(dictParametres["saut_groupes"])
+            if "masquer_vides" in dictParametres : self.checkbox_masquer_vides.SetValue(bool(dictParametres["masquer_vides"]))
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1909,8 +1916,10 @@ class Dialog(wx.Dialog):
 
         def CreationSautPage():
             try :
+                if len(story) <= 2 :
+                    return
                 element = str(story[-3])
-                if element != "PageBreak()" :
+                if "PageBreak" not in element :
                     story.append(PageBreak())
                     CreationTitreDocument()
             except :
@@ -2014,6 +2023,150 @@ class Dialog(wx.Dialog):
 
                             for IDetiquette in listeIDetiquette :
 
+                                # Création d'une liste temporaire pour le tri
+                                listeIndividus = []
+                                if IDactivite in dictConso :
+                                    if IDgroupe in dictConso[IDactivite] :
+                                        if scolarite in dictConso[IDactivite][IDgroupe] :
+                                            if IDevenement in dictConso[IDactivite][IDgroupe][scolarite] :
+                                                if IDetiquette in dictConso[IDactivite][IDgroupe][scolarite][IDevenement]:
+                                                    for IDindividu, dictIndividu in dictConso[IDactivite][IDgroupe][scolarite][IDevenement][IDetiquette].items() :
+                                                        valeursTri = (IDindividu, dictIndividu["nom"], dictIndividu["prenom"], dictIndividu["age"])
+                                                        listeIndividus.append(valeursTri)
+
+                                # Masquer les listes sans aucun individu
+                                if dictParametres.get("masquer_vides", True) and len(listeIndividus) == 0 :
+                                    continue
+
+                                if dictParametres["tri"] == "nom" : paramTri = 1 # Nom
+                                if dictParametres["tri"] == "prenom" : paramTri = 2 # Prénom
+                                if dictParametres["tri"] == "age" : paramTri = 3 # Age
+                                if dictParametres["ordre"] == "croissant" :
+                                    ordreDecroissant = False
+                                else:
+                                    ordreDecroissant = True
+                                listeIndividus = sorted(listeIndividus, key=operator.itemgetter(paramTri), reverse=ordreDecroissant)
+
+                                # Fonctions pour détecter si une unité ou une colonne a des données pour ce groupe
+                                dictGroupeConso = dictConso.get(IDactivite, {}).get(IDgroupe, {}).get(scolarite, {}).get(IDevenement, {}).get(IDetiquette, {})
+
+                                def IndividuAConsoUnite(dictIndividu, date, typeTemp, IDunite):
+                                    if not dictIndividu or "listeConso" not in dictIndividu:
+                                        return False
+                                    listeConso = dictIndividu["listeConso"]
+                                    if date not in listeConso:
+                                        return False
+                                    if typeTemp == "conso":
+                                        if IDunite in listeConso and len(listeConso[IDunite]) > 0:
+                                            return True
+                                        return False
+                                    else:
+                                        # Remplissage
+                                        if IDunite in dictUnitesRemplissage:
+                                            unitesLiees = dictUnitesRemplissage[IDunite]["unites"]
+                                            etiquettesUnitesRemplissage = dictUnitesRemplissage[IDunite]["etiquettes"]
+                                        else:
+                                            unitesLiees = []
+                                            etiquettesUnitesRemplissage = []
+                                        for IDuniteLiee in unitesLiees:
+                                            if IDuniteLiee in listeConso:
+                                                for dictConsoTemp in listeConso[IDuniteLiee]:
+                                                    valide = True
+                                                    if len(etiquettesUnitesRemplissage) > 0:
+                                                        valide = False
+                                                        for IDetiquetteTemp in etiquettesUnitesRemplissage:
+                                                            if IDetiquetteTemp in dictConsoTemp.get("etiquettes", []):
+                                                                valide = True
+                                                                break
+                                                    if valide:
+                                                        try:
+                                                            heure_min = dictUnitesRemplissage[IDunite]["heure_min"]
+                                                            heure_max = dictUnitesRemplissage[IDunite]["heure_max"]
+                                                            heure_debut = dictConsoTemp.get("heure_debut")
+                                                            heure_fin = dictConsoTemp.get("heure_fin")
+                                                            if heure_min != None and heure_max != None and heure_debut != None and heure_fin != None:
+                                                                heure_min_TM = UTILS_Dates.HeureStrEnTime(heure_min)
+                                                                heure_max_TM = UTILS_Dates.HeureStrEnTime(heure_max)
+                                                                heure_debut_TM = UTILS_Dates.HeureStrEnTime(heure_debut)
+                                                                heure_fin_TM = UTILS_Dates.HeureStrEnTime(heure_fin)
+                                                                if heure_debut_TM <= heure_max_TM and heure_fin_TM >= heure_min_TM:
+                                                                    valide = True
+                                                                else:
+                                                                    valide = False
+                                                        except:
+                                                            pass
+                                                    if valide:
+                                                        return True
+                                        return False
+
+                                def UniteAConso(date, typeTemp, IDunite):
+                                    for IDindividu, nomIndiv, prenomIndiv, ageIndiv in listeIndividus:
+                                        dictIndividu = dictGroupeConso.get(IDindividu)
+                                        if dictIndividu and IndividuAConsoUnite(dictIndividu, date, typeTemp, IDunite):
+                                            return True
+                                    return False
+
+                                def TableAConso():
+                                    for IDindividu, nomIndiv, prenomIndiv, ageIndiv in listeIndividus:
+                                        dictIndividu = dictGroupeConso.get(IDindividu)
+                                        if not dictIndividu or "listeConso" not in dictIndividu:
+                                            continue
+                                        for d in listeDates:
+                                            if d not in dictIndividu["listeConso"]:
+                                                continue
+                                            for typeTemp, IDunite, affichage in dictChoixUnites.get(IDactivite, []):
+                                                if IndividuAConsoUnite(dictIndividu, d, typeTemp, IDunite):
+                                                    return True
+                                    return False
+
+                                def ColonnePersoAData(dictColonnePerso):
+                                    if dictColonnePerso.get("donnee_code") in (None, "", "aucun"):
+                                        return True
+                                    for IDindividu, nomIndiv, prenomIndiv, ageIndiv in listeIndividus:
+                                        IDfamille = dictIndividus.get(IDindividu, {}).get("IDfamille")
+                                        donnee = ""
+                                        donnee_code = dictColonnePerso.get("donnee_code")
+                                        try:
+                                            if donnee_code == "ville_residence": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_VILLE"]
+                                            elif donnee_code == "secteur": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_SECTEUR"]
+                                            elif donnee_code == "genre": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_SEXE"]
+                                            elif donnee_code == "ville_naissance": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_VILLE_NAISS"]
+                                            elif donnee_code == "nom_ecole": donnee = dictInfosIndividus[IDindividu]["SCOLARITE_NOM_ECOLE"]
+                                            elif donnee_code == "nom_classe": donnee = dictInfosIndividus[IDindividu]["SCOLARITE_NOM_CLASSE"]
+                                            elif donnee_code == "nom_niveau_scolaire": donnee = dictInfosIndividus[IDindividu]["SCOLARITE_NOM_NIVEAU"]
+                                            elif donnee_code == "famille": donnee = dictInfosFamilles[IDfamille]["FAMILLE_NOM"]
+                                            elif donnee_code == "regime": donnee = dictInfosFamilles[IDfamille]["FAMILLE_NOM_REGIME"]
+                                            elif donnee_code == "caisse": donnee = dictInfosFamilles[IDfamille]["FAMILLE_NOM_CAISSE"]
+                                            elif donnee_code == "quotient_familial": donnee = dictInfosFamilles[IDfamille]["FAMILLE_QF_ACTUEL"]
+                                            elif donnee_code == "date_naiss": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_DATE_NAISS"]
+                                            elif donnee_code == "medecin_nom": donnee = dictInfosIndividus[IDindividu]["MEDECIN_NOM"]
+                                            elif donnee_code == "tel_mobile": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_TEL_MOBILE"]
+                                            elif donnee_code == "tel_domicile": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_TEL_DOMICILE"]
+                                            elif donnee_code == "mail": donnee = dictInfosIndividus[IDindividu]["INDIVIDU_MAIL"]
+                                            elif donnee_code == "adresse_residence":
+                                                rue = dictInfosIndividus[IDindividu].get("INDIVIDU_RUE") or ""
+                                                cp = dictInfosIndividus[IDindividu].get("INDIVIDU_CP") or ""
+                                                ville = dictInfosIndividus[IDindividu].get("INDIVIDU_VILLE") or ""
+                                                donnee = (u"%s %s %s" % (rue, cp, ville)).strip()
+                                            elif donnee_code.startswith("question_") and "famille" in donnee_code:
+                                                donnee = dictInfosFamilles[IDfamille].get("QUESTION_%s" % donnee_code[17:])
+                                            elif donnee_code.startswith("question_") and "individu" in donnee_code:
+                                                donnee = dictInfosIndividus[IDindividu].get("QUESTION_%s" % donnee_code[18:])
+                                            elif donnee_code == "codebarres_individu":
+                                                donnee = IDindividu
+                                        except:
+                                            donnee = ""
+                                        if donnee not in (None, "") and six.text_type(donnee).strip() != "":
+                                            return True
+                                    return False
+
+                                table_has_any_conso = TableAConso()
+                                masquerColonnesVides = (
+                                    dictParametres.get("masquer_colonnes_vides", True)
+                                    and not dictParametres.get("masquer_consommations", False)
+                                    and table_has_any_conso
+                                )
+
                                 # Initialisation du tableau
                                 dataTableau = []
                                 largeursColonnes = []
@@ -2054,6 +2207,9 @@ class Dialog(wx.Dialog):
                                         positionG = indexCol
                                         for typeTemp, IDunite, affichage in dictChoixUnites[IDactivite] :
                                             if (affichage == "utilise" and IDunite in listeUnites) or (affichage == "conso" and IDunite in dictUnitesAvecConso.get(date, [])) or affichage == "toujours" :
+                                                if masquerColonnesVides and affichage != "toujours" and not UniteAConso(date, typeTemp, IDunite):
+                                                    continue
+
                                                 if typeTemp == "conso" :
                                                     abregeUnite = dictUnites[IDunite]["abrege"]
                                                 else:
@@ -2079,10 +2235,16 @@ class Dialog(wx.Dialog):
                                                 largeursColonnes.append(largeur)
                                                 indexCol += 1
                                         positionD = indexCol-1
-                                        listePositionsDates.append((date, positionG, positionD))
+                                        if positionD >= positionG:
+                                            listePositionsDates.append((date, positionG, positionD))
+
+                                colPremiereUnite = positionCol1
+                                colDerniereUnite = indexCol - 1 if indexCol > positionCol1 else None
 
                                 # Colonnes personnalisées
                                 for dictColonnePerso in dictParametres["colonnes"]:
+                                    if masquerColonnesVides and not ColonnePersoAData(dictColonnePerso):
+                                        continue
                                     labelsColonnes.append(Paragraph(dictColonnePerso["nom"], styleEntetes))
                                     if dictColonnePerso["largeur"] == "automatique" :
                                         largeurColonnePerso = int(dictParametres["largeur_colonne_perso"])
@@ -2124,7 +2286,7 @@ class Dialog(wx.Dialog):
                                     ligneTempExport = []
                                     styleDate = ParagraphStyle(name="date", fontName="Helvetica-Bold", fontSize=8, spaceAfter=0, leading=9)
                                     ligne = []
-                                    for index in range(0, len(labelsColonnes)-1):
+                                    for index in range(0, len(labelsColonnes)):
                                         ligne.append("")
                                         ligneTempExport.append("")
 
@@ -2156,26 +2318,6 @@ class Dialog(wx.Dialog):
                                 listeLignesExport.append(ligne)
 
                                 # --------- Création des lignes -----------
-
-                                # Création d'une liste temporaire pour le tri
-                                listeIndividus = []
-                                if IDactivite in dictConso :
-                                    if IDgroupe in dictConso[IDactivite] :
-                                        if scolarite in dictConso[IDactivite][IDgroupe] :
-                                            if IDevenement in dictConso[IDactivite][IDgroupe][scolarite] :
-                                                if IDetiquette in dictConso[IDactivite][IDgroupe][scolarite][IDevenement]:
-                                                    for IDindividu, dictIndividu in dictConso[IDactivite][IDgroupe][scolarite][IDevenement][IDetiquette].items() :
-                                                        valeursTri = (IDindividu, dictIndividu["nom"], dictIndividu["prenom"], dictIndividu["age"])
-                                                        listeIndividus.append(valeursTri)
-
-                                if dictParametres["tri"] == "nom" : paramTri = 1 # Nom
-                                if dictParametres["tri"] == "prenom" : paramTri = 2 # Prénom
-                                if dictParametres["tri"] == "age" : paramTri = 3 # Age
-                                if dictParametres["ordre"] == "croissant" :
-                                    ordreDecroissant = False
-                                else:
-                                    ordreDecroissant = True
-                                listeIndividus = sorted(listeIndividus, key=operator.itemgetter(paramTri), reverse=ordreDecroissant)
 
                                 # Récupération des lignes individus
                                 dictTotauxColonnes = {}
@@ -2212,6 +2354,8 @@ class Dialog(wx.Dialog):
 
                                             for typeTemp, IDunite, affichage in dictChoixUnites[IDactivite] :
                                                 if (affichage == "utilise" and IDunite in listeUnites) or (affichage == "conso" and IDunite in dictUnitesAvecConso.get(date, [])) or affichage == "toujours" :
+                                                    if masquerColonnesVides and affichage != "toujours" and not UniteAConso(date, typeTemp, IDunite):
+                                                        continue
                                                     listeLabels = []
                                                     quantite = None
 
@@ -2358,6 +2502,8 @@ class Dialog(wx.Dialog):
 
                                     # Colonnes personnalisées
                                     for dictColonnePerso in dictParametres["colonnes"]:
+                                        if masquerColonnesVides and not ColonnePersoAData(dictColonnePerso):
+                                            continue
                                         IDfamille = dictIndividus[IDindividu]["IDfamille"]
                                         type_donnee = "unicode"
                                         if dictColonnePerso["donnee_code"] == None :
@@ -2527,14 +2673,6 @@ class Dialog(wx.Dialog):
                                         ligne.append("")
                                     dataTableau.append(ligne)
 
-                                # Style du tableau
-                                colPremiereUnite = 1
-                                if dictParametres["afficher_photos"] != "non" :
-                                    colPremiereUnite += 1
-                                if dictParametres["afficher_age"] == True :
-                                    colPremiereUnite += 1
-
-
                                 style = [
                                         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), # Centre verticalement toutes les cases
                                         ('FONT',(0,0),(-1,-1), "Helvetica", 7), # Donne la police de caract. + taille de police
@@ -2558,7 +2696,8 @@ class Dialog(wx.Dialog):
                                     style.append( ('ALIGN', (0, 1), (-1, 1), 'CENTRE') )
                                     style.append( ('FONT',(0,0),(-1,0), "Helvetica-Bold", 8) )
                                     for date, positionG, positionD in listePositionsDates :
-                                        style.append( ('SPAN', (positionG, 0), (positionD, 0) ) )
+                                        if positionD > positionG:
+                                            style.append( ('SPAN', (positionG, 0), (positionD, 0) ) )
                                         style.append( ('BACKGROUND', (positionG, 0), (positionD, 0), (1, 1, 1)) )
                                         style.append( ('BOX', (positionG, 0), (positionD, -1), 1, colors.black) ) # Entoure toutes les colonnes Dates
                                 else:
@@ -2615,18 +2754,14 @@ class Dialog(wx.Dialog):
                                     ligne.append(valeur)
                                 listeLignesExport.append(ligne)
 
-                                if dictParametres["afficher_informations"] == True :
-                                    colDerniereUnite = -2
-                                else :
-                                    colDerniereUnite = -1
-
                                 style = [
                                         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), # Centre verticalement toutes les cases
                                         ('FONT',(0,0),(-1,-1), "Helvetica", 7), # Donne la police de caract. + taille de police
                                         ('ALIGN', (0,0), (-1,-1), 'CENTRE'), # Centre les cases
-                                        ('GRID', (colPremiereUnite,-1), (colDerniereUnite,-1), 0.25, colors.black),
-                                        ('BACKGROUND', (colPremiereUnite, -1), (colDerniereUnite, -1), couleur_fond_total)
                                         ]
+                                if colPremiereUnite is not None and colDerniereUnite is not None and colPremiereUnite <= colDerniereUnite:
+                                    style.append(('GRID', (colPremiereUnite,-1), (colDerniereUnite,-1), 0.25, colors.black))
+                                    style.append(('BACKGROUND', (colPremiereUnite, -1), (colDerniereUnite, -1), couleur_fond_total))
 
                                 if typeListe == "period" :
                                     for date, positionG, positionD in listePositionsDates :
@@ -2692,7 +2827,7 @@ class Dialog(wx.Dialog):
         # Suppression de la dernière page si elle est vide
         try :
             element = str(story[-3])
-            if element == "PageBreak()" :
+            if "PageBreak" in element :
                 story.pop(-1)
                 story.pop(-1)
                 story.pop(-1)
@@ -2709,6 +2844,13 @@ class Dialog(wx.Dialog):
 
         # Destruction de la DlgAttente
         del DlgAttente
+
+        # Si aucune donnée à imprimer
+        if len(listeExport) == 0 :
+            dlg = wx.MessageDialog(self, _(u"Aucune consommation trouvée pour la sélection demandée !"), _(u"Information"), wx.OK | wx.ICON_INFORMATION)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return False
 
         # Si mode export Excel
         if modeExport == True :
@@ -2782,13 +2924,13 @@ class Dialog(wx.Dialog):
         """ Récupération des paramètres """
         dictParametres = {}
         dictParametres["type_liste"] = self.GetTypeListe()
-        dictParametres.update(self.GetPage("activites").GetParametres())
         dictParametres.update(self.GetPage("scolarite").GetParametres())
         dictParametres.update(self.GetPage("etiquettes").GetParametres())
         dictParametres.update(self.GetPage("evenements").GetParametres())
         dictParametres.update(self.GetPage("unites").GetParametres())
         dictParametres.update(self.GetPage("colonnes").GetParametres())
         dictParametres.update(self.GetPage("options").GetParametres())
+        dictParametres.update(self.GetPage("activites").GetParametres())
         return dictParametres
 
     def SetParametres(self, dictParametres={}):
