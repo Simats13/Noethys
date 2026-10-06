@@ -2056,8 +2056,9 @@ class Dialog(wx.Dialog):
                                     listeConso = dictIndividu["listeConso"]
                                     if date not in listeConso:
                                         return False
+                                    consoDate = listeConso[date]
                                     if typeTemp == "conso":
-                                        if IDunite in listeConso and len(listeConso[IDunite]) > 0:
+                                        if IDunite in consoDate and len(consoDate[IDunite]) > 0:
                                             return True
                                         return False
                                     else:
@@ -2069,8 +2070,8 @@ class Dialog(wx.Dialog):
                                             unitesLiees = []
                                             etiquettesUnitesRemplissage = []
                                         for IDuniteLiee in unitesLiees:
-                                            if IDuniteLiee in listeConso:
-                                                for dictConsoTemp in listeConso[IDuniteLiee]:
+                                            if IDuniteLiee in consoDate:
+                                                for dictConsoTemp in consoDate[IDuniteLiee]:
                                                     valide = True
                                                     if len(etiquettesUnitesRemplissage) > 0:
                                                         valide = False
@@ -2163,7 +2164,6 @@ class Dialog(wx.Dialog):
                                 table_has_any_conso = TableAConso()
                                 masquerColonnesVides = (
                                     dictParametres.get("masquer_colonnes_vides", True)
-                                    and not dictParametres.get("masquer_consommations", False)
                                     and table_has_any_conso
                                 )
 
