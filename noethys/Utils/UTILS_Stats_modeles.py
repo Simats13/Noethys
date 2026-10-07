@@ -274,7 +274,37 @@ class HTML():
     
     def SetParametres(self, dictParametres={}) :
         self.dictParametres = dictParametres
-        
+
+    def GetObjet(self, code):
+        """ Recherche un objet par son code """
+        for dictRubrique in self.liste_objets:
+            for dictPage in dictRubrique["pages"]:
+                for objet in dictPage["objets"]:
+                    if getattr(objet, "code", None) == code:
+                        return objet
+        return None
+
+    def GetPersonnalisations(self):
+        """ Récupère toutes les personnalisations des tableaux """
+        dictPersonnalisations = {}
+        for dictRubrique in self.liste_objets:
+            for dictPage in dictRubrique["pages"]:
+                for objet in dictPage["objets"]:
+                    if hasattr(objet, "dictPersonnalisation") and getattr(objet, "dictPersonnalisation", None):
+                        dictPersonnalisations[objet.code] = dict(objet.dictPersonnalisation)
+        return dictPersonnalisations
+
+    def SetPersonnalisations(self, dictPersonnalisations={}):
+        """ Applique un dictionnaire de personnalisations aux objets """
+        for dictRubrique in self.liste_objets:
+            for dictPage in dictRubrique["pages"]:
+                for objet in dictPage["objets"]:
+                    if hasattr(objet, "dictPersonnalisation"):
+                        if objet.code in dictPersonnalisations:
+                            objet.dictPersonnalisation = dict(dictPersonnalisations[objet.code])
+                        else:
+                            objet.dictPersonnalisation = {}
+
     def MAJ(self, rubrique=None, page=None):
         """ MAJ d'une rubrique ou d'une page par le code ou tout """
         if rubrique == None and page == None : 
@@ -282,7 +312,7 @@ class HTML():
         else : 
             tout = False
         
-        if len(self.dictParametres["listeActivites"]) == 0 : 
+        if len(self.dictParametres.get("listeActivites", [])) == 0 : 
             return
         
         DB = GestionDB.DB() 
@@ -317,7 +347,7 @@ class HTML():
         else : 
             tout = False
         
-        if len(self.dictParametres["listeActivites"]) == 0 : 
+        if len(self.dictParametres.get("listeActivites", [])) == 0 : 
             return ""
         
         # Mode 'affichage'
@@ -325,9 +355,37 @@ class HTML():
             html = u"""<HTML><BODY><FONT SIZE=-1>"""
             for dictRubrique in self.liste_objets :
                 for dictPage in dictRubrique["pages"] :
-                    for objet in dictPage["objets"] :
-                        if objet.visible == True and (tout == True or rubrique == dictRubrique["code"] or page == dictPage["code"]) :
-                            html += "<P>%s</P>" % objet.GetObjetHTML()
+                    if (tout == True or rubrique == dictRubrique["code"] or page == dictPage["code"]) :
+                        codeRub = dictRubrique["code"]
+                        codePg = dictPage["code"]
+
+                        # Signalement des éléments masqués
+                        nb_masques = sum(1 for obj in dictPage["objets"] if getattr(obj, "visible", True) == False)
+                        if nb_masques > 0:
+                            html += u"""<CENTER><TABLE BORDER=0 CELLSPACING=0 WIDTH="90%%" BGCOLOR="#FEF9E7">
+                            <TR><TD ALIGN=CENTER>
+                            <FONT SIZE=-2 COLOR="#B7950B"><B>ℹ %d élément(s) masqué(s) sur cette page</B></FONT> &nbsp;
+                            <A HREF="organiser_page:%s:%s" STYLE="text-decoration:none; color:#B7950B; font-weight:bold;"><FONT SIZE=-2>[Afficher / Réorganiser]</FONT></A>
+                            </TD></TR></TABLE></CENTER><BR>""" % (nb_masques, codeRub, codePg)
+
+                        for objet in dictPage["objets"] :
+                            if getattr(objet, "visible", True) == True :
+                                html += "<P>%s</P>" % objet.GetObjetHTML(mode="affichage")
+
+                        html += u"""<BR><CENTER><TABLE BORDER=0 CELLSPACING=0 WIDTH="90%%" BGCOLOR="#F4F8FA">
+                        <TR><TD ALIGN=CENTER>
+                        <A HREF="organiser_page:%s:%s" STYLE="text-decoration:none; color:#2C3E50; font-weight:bold;">
+                        <FONT SIZE=-1>📑 Organiser les tableaux</FONT>
+                        </A>
+                        &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+                        <A HREF="gestion_onglets" STYLE="text-decoration:none; color:#16A085; font-weight:bold;">
+                        <FONT SIZE=-1>🗂️ Gérer les onglets</FONT>
+                        </A>
+                        &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+                        <A HREF="nouveau_tab:%s:%s" STYLE="text-decoration:none; color:#1C4E80; font-weight:bold;">
+                        <FONT SIZE=-1>➕ Créer un nouveau tableau</FONT>
+                        </A>
+                        </TD></TR></TABLE></CENTER><BR>""" % (codeRub, codePg, codeRub, codePg)
             html += u"""</FONT></BODY></HTML>"""
 
         # Mode 'impression'
@@ -378,7 +436,7 @@ class HTML():
                             html += u"""<BLOCKQUOTE><U><B>%s. %s</B></U>""" % (alphabet[numPage], dictPage["nom"])
                             for objet in dictPage["objets"] :
                                 if objet.code in selectionsCodes :
-                                    html += u"""<P>%s</P>""" % objet.GetObjetHTML() 
+                                    html += u"""<P>%s</P>""" % objet.GetObjetHTML(mode="impression") 
                             html += u"""</BLOCKQUOTE>"""
                             numPage += 1
                     numRubrique += 1
@@ -423,7 +481,7 @@ class Texte(Objet):
         self.texte = u""
         self.categorie = "texte"
         
-    def GetObjetHTML(self):
+    def GetObjetHTML(self, mode="affichage"):
         return self.texte
 
 
@@ -436,7 +494,9 @@ class Tableau(Objet):
         self.lignes = [] # (1, 2, 3)
         self.totaux = [] # (32, 34, 54) 
         self.dictParametres = {}
-    def GetObjetHTML(self):
+        self.dictPersonnalisation = {}
+
+    def GetObjetHTML(self, mode="affichage"):
         html = u""
 
         # Init Couleurs
@@ -449,40 +509,92 @@ class Tableau(Objet):
         # Création du tableau
         if len(self.lignes) == 0 :
             return html
-            
+
+        # Application des personnalisations si présentes
+        perso = getattr(self, "dictPersonnalisation", {}) or {}
+        nomTableau = perso.get("titre") or self.nom
+
+        indicesColonnes = list(range(len(self.colonnes)))
+        if "colonnes_visibles" in perso and len(perso["colonnes_visibles"]) > 0:
+            indicesColonnes = [i for i in perso["colonnes_visibles"] if i < len(self.colonnes)]
+
+        dictColsLibelles = perso.get("colonnes_libelles", {})
+        colonnesAffichees = []
+        for idx in indicesColonnes:
+            lblOriginal, lrg = self.colonnes[idx]
+            lblFinal = dictColsLibelles.get(str(idx), dictColsLibelles.get(idx, lblOriginal))
+            colonnesAffichees.append((lblFinal, lrg))
+
+        if len(colonnesAffichees) == 0:
+            colonnesAffichees = self.colonnes
+            indicesColonnes = list(range(len(self.colonnes)))
+
+        lignesMasquees = set(perso.get("lignes_masquees", []))
+        dictLignesLibelles = perso.get("lignes_libelles", {})
+        lignesAffichees = []
+        for idxLigne, ligne in enumerate(self.lignes):
+            if idxLigne in lignesMasquees:
+                continue
+            ligneModifiee = list(ligne)
+            cleLigne = str(idxLigne)
+            if cleLigne in dictLignesLibelles or idxLigne in dictLignesLibelles:
+                ligneModifiee[0] = dictLignesLibelles.get(cleLigne, dictLignesLibelles.get(idxLigne))
+            ligneFiltree = [ligneModifiee[i] for i in indicesColonnes if i < len(ligneModifiee)]
+            lignesAffichees.append(ligneFiltree)
+
+        if len(lignesAffichees) == 0:
+            return html
+
+        totauxAffiches = []
+        if len(self.totaux) > 0:
+            totauxAffiches = [self.totaux[i] for i in indicesColonnes if i < len(self.totaux)]
+
         if self.largeur == None :
             largeurTableau = "100%"
         else:
             largeurTableau = str(self.largeur)
-        html = u"""<CENTER><TABLE bgcolor="%s" CELLSPACING=1 BORDER=0 COLS=%d WIDTH="%s">""" % (couleurCadre, len(self.colonnes), largeurTableau)
+
+        # Liens d'actions et d'organisation (en mode affichage uniquement)
+        if mode == "affichage":
+            estPerso = bool(perso)
+            badgePerso = u""" <FONT SIZE=-2 COLOR="#A04000"><B>(Personnalisé)</B></FONT>""" if estPerso else u""
+            html += u"""<CENTER><TABLE BORDER=0 CELLSPACING=0 WIDTH="%s"><TR><TD ALIGN=RIGHT><FONT SIZE=-2><A HREF="monter_tab:%s" STYLE="text-decoration:none; color:#2C3E50;">[⬆ Monter]</A> &nbsp; <A HREF="descendre_tab:%s" STYLE="text-decoration:none; color:#2C3E50;">[⬇ Descendre]</A> &nbsp; <A HREF="masquer_tab:%s" STYLE="text-decoration:none; color:#7F8C8D;">[👁 Masquer]</A> &nbsp; <A HREF="custom_tab:%s" STYLE="text-decoration:none; color:#1C4E80;"><B>[⚙ Personnaliser]</B></A>%s</FONT></TD></TR></TABLE></CENTER>""" % (largeurTableau, self.code, self.code, self.code, self.code, badgePerso)
+
+        html += u"""<CENTER><TABLE bgcolor="%s" CELLSPACING=1 BORDER=0 COLS=%d WIDTH="%s">""" % (couleurCadre, len(colonnesAffichees), largeurTableau)
         
         # Création du titre
-        if self.nom != u"" :
-            html += """<TR bgcolor="%s" ALIGN=CENTER><TD COLSPAN="%d"><B>%s</B></TD></TR>""" % (couleurFondTitre, len(self.colonnes), self.nom)
+        if nomTableau != u"" :
+            html += """<TR bgcolor="%s" ALIGN=CENTER><TD COLSPAN="%d"><B>%s</B></TD></TR>""" % (couleurFondTitre, len(colonnesAffichees), nomTableau)
         
         # Création de la ligne des entêtes
-        if len(self.colonnes) > 0 :
+        if len(colonnesAffichees) > 0 :
             html += u"""<TR ALIGN=CENTER>"""
-            for label, largeur in self.colonnes :
+            for label, largeur in colonnesAffichees :
                 html += u"""<TD bgcolor="%s" WIDTH="%s"><I>%s</I></TD>""" % (couleurFondLabel, largeur, label)
             html += u""""""
         
         # Création des lignes
-        if len(self.lignes) > 0 :
-            for ligne in self.lignes :
-                html += u"""<TR ALIGN=CENTER>"""
-                for label in ligne :
-                    html += u"""<TD bgcolor="%s">%s</TD>""" % (couleurFondLigne, label)
-                html += u"""</TR>"""
+        for ligne in lignesAffichees :
+            html += u"""<TR ALIGN=CENTER>"""
+            for label in ligne :
+                html += u"""<TD bgcolor="%s">%s</TD>""" % (couleurFondLigne, label)
+            html += u"""</TR>"""
 
         # Création des totaux
-        if len(self.totaux) > 0 :
+        if len(totauxAffiches) > 0 :
             html += u"""<TR ALIGN=CENTER>"""
-            for label in self.totaux :
+            for label in totauxAffiches :
                 html += u"""<TD bgcolor="%s"><B>%s</B></TD>""" % (couleurFondTotaux, label)
             html += u"""</TR>"""
         
         html += u"""</TABLE></CENTER>"""
+
+        # Note / Observation éventuelle sous le tableau
+        note = perso.get("note", "").strip()
+        if note != "":
+            note_html = note.replace("\n", "<BR>")
+            html += u"""<CENTER><TABLE BORDER=0 CELLSPACING=0 WIDTH="%s"><TR><TD ALIGN=LEFT><FONT SIZE=-2 COLOR="#444444"><I><B>Note :</B> %s</I></FONT></TD></TR></TABLE></CENTER>""" % (largeurTableau, note_html)
+
         return html
     
 
@@ -509,7 +621,7 @@ class Graphe(Objet):
         self.bitmap = self.ConvertMPLtoBMP(figure)
         self.stockImages.AddFile(self.nomImage, self.bitmap , wx.BITMAP_TYPE_PNG)
         
-    def GetObjetHTML(self):
+    def GetObjetHTML(self, mode="affichage"):
         if self.bitmap == None : return u""
         # Création Html
         html = """<CENTER><A HREF='%s'><img src="memory:%s"></A></CENTER>""" % (self.code, self.nomImage)

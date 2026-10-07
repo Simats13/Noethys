@@ -54,21 +54,23 @@ class CTRL_Objets(CT.CustomTreeCtrl):
         self.root = self.AddRoot(_(u"Objets"))
         
         for dictRubrique in self.liste_objets :
+            if dictRubrique.get("visible", True) == False :
+                continue
             # Rubriques
             brancheRubrique = self.AppendItem(self.root, dictRubrique["nom"], ct_type=1)
             self.SetPyData(brancheRubrique, {"categorie":"rubrique", "code":dictRubrique["code"]})
             self.SetItemBold(brancheRubrique)
             self.SetItemImage(brancheRubrique, self.dictImages["rubrique"]["index"])
-            if dictRubrique["visible"] == True :
-                brancheRubrique.Check() 
+            brancheRubrique.Check() 
                 
             for dictPage in dictRubrique["pages"] :
+                if dictPage.get("visible", True) == False :
+                    continue
                 # Pages
                 branchePage = self.AppendItem(brancheRubrique, dictPage["nom"], ct_type=1)
                 self.SetPyData(branchePage, {"categorie":"page", "code":dictPage["code"]})
                 self.SetItemImage(branchePage, self.dictImages["page"]["index"])
-                if dictPage["visible"] == True :
-                    branchePage.Check() 
+                branchePage.Check() 
 
                 for objet in dictPage["objets"] :
                     # Objets
@@ -78,7 +80,7 @@ class CTRL_Objets(CT.CustomTreeCtrl):
                     self.SetItemFont(brancheObjet, wx.Font(7, wx.DEFAULT, wx.NORMAL, wx.NORMAL, 0, ""))
                     self.SetPyData(brancheObjet, {"categorie":"objet", "code":objet.code})
                     self.SetItemImage(brancheObjet, self.dictImages[objet.categorie]["index"])
-                    if objet.visible == True :
+                    if getattr(objet, "visible", True) == True :
                         brancheObjet.Check() 
             
         self.ExpandAll() 
@@ -139,6 +141,31 @@ class CTRL_Objets(CT.CustomTreeCtrl):
                 for index3 in range(self.GetChildrenCount(branchePage, recursively=False)) :
                     self.CheckItem(branchePage, etat)
             
+                    brancheObjet = self.GetNextChild(branchePage, index3+1)[0]
+                branchePage = self.GetNextChild(brancheRubrique, index2+1)[0]
+    def SetCoches(self, listeCodes=[]):
+        """ Coche les éléments dont le code est dans listeCodes """
+        self.Coche(False)
+        if not listeCodes:
+            return
+        brancheRubrique = self.GetFirstChild(self.root)[0]
+        for index1 in range(self.GetChildrenCount(self.root, recursively=False)) :
+            codeRubrique = self.GetItemPyData(brancheRubrique)["code"]
+            if codeRubrique in listeCodes:
+                self.CheckItem(brancheRubrique, True)
+
+            branchePage = self.GetFirstChild(brancheRubrique)[0]
+            for index2 in range(self.GetChildrenCount(brancheRubrique, recursively=False)) :
+                codePage = self.GetItemPyData(branchePage)["code"]
+                if codePage in listeCodes:
+                    self.CheckItem(branchePage, True)
+
+                brancheObjet = self.GetFirstChild(branchePage)[0]
+                for index3 in range(self.GetChildrenCount(branchePage, recursively=False)) :
+                    codeObjet = self.GetItemPyData(brancheObjet)["code"]
+                    if codeObjet in listeCodes:
+                        self.CheckItem(brancheObjet, True)
+
                     brancheObjet = self.GetNextChild(branchePage, index3+1)[0]
                 branchePage = self.GetNextChild(brancheRubrique, index2+1)[0]
             brancheRubrique = self.GetNextChild(self.root, index1+1)[0]
