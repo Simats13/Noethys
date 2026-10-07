@@ -154,3 +154,4 @@ $RECYCLE.BIN/
 *.lnk
 noethys/Rapports_stats/tableaux_personnalises.json
 noethys/Rapports_stats/onglets_visibles.json
+Output/
