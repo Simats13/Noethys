@@ -159,6 +159,7 @@ class Dialog(wx.Dialog):
                     {"nom" : _(u"Nombre"), "code" : "individus_nombre", "image" : None, "ctrl_html" : None, "visible" : True, "objets" : [
                             INDIVIDUS.Texte_nombre_individus(),
                             INDIVIDUS.Tableau_nombre_individus(),
+                            INDIVIDUS.Tableau_evolution_inscriptions(),
                             INDIVIDUS.Graphe_nombre_individus(),
                             ]},
 
@@ -167,6 +168,8 @@ class Dialog(wx.Dialog):
                             INDIVIDUS.Graphe_nouveaux_individus(),
                             INDIVIDUS.Graphe_arrivee_individus(),
                             INDIVIDUS.Tableau_anciens_individus(),
+                            INDIVIDUS.Tableau_mouvements_individus(),
+                            INDIVIDUS.Tableau_taux_rotation(),
                             ]},
 
                     {"nom" : _(u"Genre"), "code" : "individus_genre", "image" : None, "ctrl_html" : None, "visible" : True, "objets" : [

@@ -502,7 +502,10 @@ class Dialog(wx.Dialog):
             listeActivites = []
             
         self.ctrl_mode.SetParametres(mode, periode)
-        self.ctrl_activites.SetActivites(listeActivites) 
+        if "modeActivites" in dictParametres and "valeursActivites" in dictParametres :
+            self.ctrl_activites.SetValeurs(dictParametres["modeActivites"], dictParametres["valeursActivites"])
+        else :
+            self.ctrl_activites.SetActivites(listeActivites) 
 
     def OnBoutonOk(self, event): 
         self.dictParametres = {"init":datetime.datetime.now()}
@@ -525,6 +528,9 @@ class Dialog(wx.Dialog):
         
         self.dictParametres["listeActivites"] = self.listeActivites
         self.dictParametres["dictActivites"] = self.dictActivites
+        mode_activites, valeurs_activites = self.ctrl_activites.GetValeurs()
+        self.dictParametres["modeActivites"] = mode_activites
+        self.dictParametres["valeursActivites"] = valeurs_activites
         
         # Options
 
