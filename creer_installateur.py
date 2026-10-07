@@ -72,13 +72,30 @@ def Etape3_CompilationInstallateur():
         raise RuntimeError("Compilateur Inno Setup (ISCC.exe) introuvable !")
     print("Utilisation de ISCC :", iscc)
 
+    # Fermer d'éventuels processus d'installation précédents encore ouverts
+    try:
+        subprocess.run(["taskkill", "/F", "/IM", "Setup_Noethys*"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["taskkill", "/F", "/IM", "Noethys.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     iss_file = os.path.join(REP_RACINE, "installer_noethys.iss")
     cmd = [iscc, iss_file]
     print("Exécution de :", " ".join(cmd))
-    res = subprocess.run(cmd, cwd=REP_RACINE)
-    if res.returncode != 0:
-        raise RuntimeError("Erreur lors de la création de l'installateur Inno Setup (code: %s)" % res.returncode)
+    
+    # Tentatives d'exécution (avec retry si verrouillage temporaire par l'antivirus Windows Defender)
+    max_tentatives = 2
+    for tentative in range(1, max_tentatives + 1):
+        res = subprocess.run(cmd, cwd=REP_RACINE)
+        if res.returncode == 0:
+            break
+        if tentative < max_tentatives:
+            print("\n[Avertissement] Échec de compilation (potentiel verrouillage Windows Defender). Nouvelle tentative dans 3 secondes...")
+            import time
+            time.sleep(3)
+        else:
+            raise RuntimeError("Erreur lors de la création de l'installateur Inno Setup (code: %s)" % res.returncode)
 
     print("=" * 60)
     print("SUCCÈS : Installateur généré avec succès !")
