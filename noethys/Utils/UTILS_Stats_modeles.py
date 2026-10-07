@@ -26,6 +26,52 @@ from numpy import arange, sqrt, array, asarray, ones, exp, convolve, linspace
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import copy
+import functools
+
+
+def NouvelleFigure():
+    """ Crée une figure hors pyplot : pas de fenêtre GUI cachée, et libérée par le ramasse-miettes """
+    figure = Figure()
+    FigureCanvasAgg(figure)
+    return figure
+
+
+# Cache des résultats des requêtes statistiques (plusieurs jeux de paramètres, ex : période N et N-1)
+DICT_CACHE = {}
+TAILLE_MAX_CACHE = 10
+
+def Memoriser(fonction):
+    """ Décorateur : mémorise le résultat de fonction(DB, dictParametres, ...) selon les paramètres """
+    @functools.wraps(fonction)
+    def wrapper(DB, dictParametres, *args, **kwargs):
+        cle = (fonction.__module__, fonction.__name__, args, tuple(sorted(kwargs.items())))
+        entrees = DICT_CACHE.setdefault(cle, [])
+        for parametres, resultat in entrees:
+            if parametres == dictParametres:
+                return resultat
+        resultat = fonction(DB, dictParametres, *args, **kwargs)
+        entrees.append((copy.deepcopy(dictParametres), resultat))
+        if len(entrees) > TAILLE_MAX_CACHE:
+            del entrees[0]
+        return resultat
+    return wrapper
+
+def ViderCache():
+    DICT_CACHE.clear()
+
+
+_MEMORY_FS_HANDLER = None
+
+def GetMemoryFSHandler():
+    """ Un seul handler mémoire enregistré pour toute l'application """
+    global _MEMORY_FS_HANDLER
+    if _MEMORY_FS_HANDLER is None:
+        _MEMORY_FS_HANDLER = wx.MemoryFSHandler()
+        wx.FileSystem.AddHandler(_MEMORY_FS_HANDLER)
+    return _MEMORY_FS_HANDLER
 
 
 COULEUR_VERT_POMME = (151, 253, 79)
@@ -269,8 +315,7 @@ class HTML():
         self.dictParametres = {}
         
         # Création du stock d'images
-        wx.FileSystem.AddHandler(wx.MemoryFSHandler())
-        self.stockImages = wx.MemoryFSHandler()
+        self.stockImages = GetMemoryFSHandler()
     
     def SetParametres(self, dictParametres={}) :
         self.dictParametres = dictParametres
@@ -332,7 +377,7 @@ class HTML():
                         # MAJ de l'objet
                         if maj == True :
                             if objet.categorie == "graphe" :
-                                figure = matplotlib.pyplot.figure()
+                                figure = NouvelleFigure()
                                 figure = objet.MAJ(figure=figure, DB=DB, dictParametres=self.dictParametres)
                                 #figure.clear()
                                 objet.MemoriseImage(figure) 
@@ -452,8 +497,9 @@ class HTML():
             for dictPage in dictRubrique["pages"] :
                 for objet in dictPage["objets"] :
                     if objet.code == code :
-                        figure = matplotlib.pyplot.figure()
+                        figure = NouvelleFigure()
                         figure = objet.MAJ(figure=figure, DB=DB, dictParametres=self.dictParametres)
+                        DB.Close()
                         return figure
         DB.Close() 
         return None
