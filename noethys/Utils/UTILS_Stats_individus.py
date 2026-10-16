@@ -22,6 +22,7 @@ from Utils import UTILS_Stats_modeles as MODELES
 
 DICT_COMPARATIF_NOMBRE = {"dictParametres" : {}, "dictResultats" : {} }
 
+@MODELES.Memoriser
 def GetComparatifNombre(DB, dictParametres) :
     dictResultats = {}
     
@@ -161,6 +162,7 @@ def GetCodeTrancheAge(age):
     else:
         return "100+"
 
+@MODELES.Memoriser
 def GetDictAges(DB, dictParametres, mode_tranches=False) :
     # Vérifie si les données n'existent pas déjà
     # global DICT_AGES
@@ -202,17 +204,19 @@ def GetDictAges(DB, dictParametres, mode_tranches=False) :
     dictAges = {}
     dictAgesGenres = {}
     dictAnnees = {}
+    # Date de référence pour le calcul des âges (calculée une seule fois)
+    if str(date_fin) == "2999-01-01" :
+        datedujour = MODELES.GetDateExtremeActivites(DB, listeActivites=dictParametres["listeActivites"], typeDate="date_milieu", mode="max")
+    else :
+        datedujour = date_fin
+    if datedujour == None :
+        datedujour = datetime.date.today() 
+
     for IDindividu, IDcivilite, date_naiss in listeDonnees :
         genre = str(dictCivilites[IDcivilite]["sexe"])
 
         if date_naiss != None and date_naiss != "" :
             date_naiss = datetime.date(int(date_naiss[:4]), int(date_naiss[5:7]), int(date_naiss[8:10]))
-            if str(date_fin) == "2999-01-01" :
-                datedujour = MODELES.GetDateExtremeActivites(DB, listeActivites=dictParametres["listeActivites"], typeDate="date_milieu", mode="max")
-            else :
-                datedujour = date_fin
-            if datedujour == None :
-                datedujour = datetime.date.today() 
             age = (datedujour.year - date_naiss.year) - int((datedujour.month, datedujour.day) < (date_naiss.month, date_naiss.day))
             annee = date_naiss.year
         else:
@@ -411,6 +415,7 @@ def GetListeActivitesPro(DB, dictParametres) :
 
 DICT_ANCIENNETE = {"dictParametres" : {}, "dictResultats" : {}, "listeMoisPeriode" : [] }
 
+@MODELES.Memoriser
 def GetAnciennete(DB, dictParametres):
     # Vérifie si les données n'existent pas déjà
     global DICT_ANCIENNETE
@@ -468,6 +473,7 @@ def GetAnciennete(DB, dictParametres):
 DICT_DESINSCRITS = {"dictParametres": {}, "dictResultats": {}, "listeMoisPeriode": []}
 
 
+@MODELES.Memoriser
 def GetDesinscrits(DB, dictParametres):
     # Vérifie si les données n'existent pas déjà
     global DICT_DESINSCRITS
@@ -518,6 +524,7 @@ def GetDesinscrits(DB, dictParametres):
 DICT_INSCRITS_PERIODE = {"dictParametres": {}, "nbre": 0}
 
 
+@MODELES.Memoriser
 def GetNombreInscritsPeriode(DB, dictParametres):
     # Vérifie si les données n'existent pas déjà
     global DICT_INSCRITS_PERIODE
@@ -650,6 +657,7 @@ def GetLabelsComparaisonN_N1(dictParametres, dictParametresN1):
 DICT_INSCRIPTIONS_ACTIVITES = {"dictParametres": {}, "dictAct": {}, "tot": 0}
 
 
+@MODELES.Memoriser
 def GetInscriptionsActivitesEtTotal(DB, dictParametres):
     global DICT_INSCRIPTIONS_ACTIVITES
     if DICT_INSCRIPTIONS_ACTIVITES["dictParametres"] == dictParametres:

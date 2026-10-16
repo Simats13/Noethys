@@ -309,7 +309,8 @@ class Dialog(wx.Dialog):
         self.box_informations_staticbox = wx.StaticBox(self, -1, _(u"Informations"))
         self.ctrl_labelbook = LB.LabelBook(self, -1, agwStyle=LB.INB_DRAW_SHADOW | LB.INB_LEFT)
 
-        self.baseHTML = MODELES.HTML(liste_objets=self.listeObjets) 
+        MODELES.ViderCache()
+        self.baseHTML = MODELES.HTML(liste_objets=self.listeObjets)
         self.ChargerOngletsPersoSauvegardes()
         self.InitLabelbook() 
         if self.ctrl_labelbook.GetPageCount() > 0:
