@@ -63,6 +63,20 @@ COULEUR_FOND_TITRE = (204, 204, 255) # version PDF : (0.8, 0.8, 1) # Vert -> (0.
 DICT_CIVILITES = Civilites.GetDictCivilites()
 
 
+def NettoyerEmojis(texte=u""):
+    """ Retire les émojis non affichables par les polices PDF standard (Helvetica) """
+    if not texte:
+        return texte
+    resultat = []
+    for car in texte:
+        code = ord(car)
+        if code > 0xFFFF or 0x2600 <= code <= 0x27BF or 0x2B00 <= code <= 0x2BFF or 0x25A0 <= code <= 0x25FF                 or code in (0xFE0F, 0xFE0E, 0x200D, 0x20E3):
+            continue
+        resultat.append(car)
+    return u"".join(resultat).strip()
+
+
+
 def FormateCondition(listeDonnees=[]):
     if len(listeDonnees) == 0:
         condition = "()"
@@ -2286,9 +2300,10 @@ class Dialog(wx.Dialog):
             stylePB = ParagraphStyle(
                 name="pense_bete", fontName="Helvetica", fontSize=9, leading=12, textColor=colors.black
             )
-            texteAffichage = textePB
-            if not texteAffichage.strip().startswith(u"⚠️") and not texteAffichage.strip().lower().startswith(u"alerte"):
-                texteAffichage = u"<b>⚠️ Alerte :</b> " + texteAffichage
+            texteAffichage = NettoyerEmojis(textePB)
+            if not texteAffichage.lower().startswith(u"alerte"):
+                texteAffichage = u"<b>Alerte :</b> " + texteAffichage
+            texteAffichage = u"<img src='%s' width='10' height='10' valign='middle'/> %s" % (Chemins.GetStaticPath("Images/16x16/Attention.png"), texteAffichage)
             paraPB = Paragraph(texteAffichage, stylePB)
             tablePB = Table([[paraPB]], [largeurContenu])
             tablePB.setStyle(TableStyle([
@@ -2786,15 +2801,9 @@ class Dialog(wx.Dialog):
                                         ligne.append(img)
                                         indexColonne += 1
 
-                                    # Nom
+                                    # Nom (le mémo est affiché uniquement dans la colonne Informations)
                                     if stylesCouleur is not None:
-                                        texteAlerte = memo_individu["texte"]
-                                        if typeListe == "period" and memo_date:
-                                            texteAlerte = u"%02d/%02d : %s" % (memo_date.day, memo_date.month, texteAlerte)
-                                        codeCoul = stylesCouleur.get("hex_texte", "#C0392B")
-                                        styleNomAlerte = ParagraphStyle(name="nom_alerte_%d" % IDindividu, fontName="Helvetica", alignment=1, fontSize=7, leading=8)
-                                        htmlNom = u"<b>%s %s</b><br/><font color='%s' size='5.5'><b>⚠️ %s</b></font>" % (nom, prenom, codeCoul, texteAlerte)
-                                        ligne.append(Paragraph(htmlNom, styleNomAlerte))
+                                        ligne.append(Paragraph(u"<b>%s %s</b>" % (nom, prenom), styleNormal))
                                     else:
                                         ligne.append(Paragraph(u"%s %s" % (nom, prenom), styleNormal))
                                     indexColonne += 1
@@ -3030,7 +3039,7 @@ class Dialog(wx.Dialog):
                                     if IDindividu in dictMemos :
                                         for date in listeDates :
                                             if date in dictMemos[IDindividu] :
-                                                memo_texte = dictMemos[IDindividu][date]["texte"]
+                                                memo_texte = NettoyerEmojis(dictMemos[IDindividu][date]["texte"])
                                                 memo_couleur = dictMemos[IDindividu][date]["couleur"]
                                                 if typeListe == "period" :
                                                     memo_texte = u"%02d/%02d/%04d : %s" % (date.day, date.month, date.year, memo_texte)
@@ -3038,7 +3047,7 @@ class Dialog(wx.Dialog):
                                                 stylesCoul = UTILS_Memos_journee.GetStylesCouleurPDF(memo_couleur)
                                                 if stylesCoul is not None:
                                                     coulHex = stylesCoul.get("hex_texte", "#C0392B")
-                                                    listeInfos.append(ParagraphAndImage(Paragraph(u"<FONT color='%s'><b>⚠️ %s</b></FONT>" % (coulHex, memo_texte), paraStyle), Image(Chemins.GetStaticPath("Images/16x16/Information.png"),width=8, height=8), xpad=1, ypad=0, side="left"))
+                                                    listeInfos.append(ParagraphAndImage(Paragraph(u"<FONT color='%s'><b>%s</b></FONT>" % (coulHex, memo_texte), paraStyle), Image(Chemins.GetStaticPath("Images/16x16/Information.png"),width=8, height=8), xpad=1, ypad=0, side="left"))
                                                 else:
                                                     listeInfos.append(ParagraphAndImage(Paragraph(memo_texte, paraStyle), Image(Chemins.GetStaticPath("Images/16x16/Information.png"),width=8, height=8), xpad=1, ypad=0, side="left"))
 
