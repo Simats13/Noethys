@@ -1031,6 +1031,19 @@ def GetConnexionReseau(nomFichier="", pooling=True):
 
         connexion = mysql.connector.connect(**params)
 
+    # Desactivation de ONLY_FULL_GROUP_BY pour la compatibilite des requetes Noethys
+    try:
+        cur = connexion.cursor()
+        cur.execute("SELECT @@sql_mode;")
+        row = cur.fetchone()
+        if row and row[0]:
+            modes = [m for m in row[0].split(',') if m and m != 'ONLY_FULL_GROUP_BY']
+            new_mode = ','.join(modes)
+            cur.execute("SET SESSION sql_mode='%s';" % new_mode)
+        cur.close()
+    except Exception as err:
+        print("Erreur adaptation sql_mode :", err)
+
     return connexion, nomFichier
 
 
