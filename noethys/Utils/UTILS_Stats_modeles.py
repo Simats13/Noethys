@@ -435,7 +435,7 @@ class HTML():
                         if dictPage["code"] in selectionsCodes and (page == None or page == dictPage["code"]) :
                             html += u"""<BLOCKQUOTE><U><B>%s. %s</B></U>""" % (alphabet[numPage], dictPage["nom"])
                             for objet in dictPage["objets"] :
-                                if objet.code in selectionsCodes :
+                                if objet.code in selectionsCodes and getattr(objet, "visible", True) == True :
                                     html += u"""<P>%s</P>""" % objet.GetObjetHTML(mode="impression") 
                             html += u"""</BLOCKQUOTE>"""
                             numPage += 1

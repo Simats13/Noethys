@@ -870,6 +870,8 @@ class Dialog(wx.Dialog):
                     if getattr(obj, "code", None) == codeObjet:
                         obj.visible = False
                         if hasattr(self, "ctrl_impression") and self.ctrl_impression:
+                            if hasattr(self.ctrl_impression, "DecocherCode"):
+                                self.ctrl_impression.DecocherCode(codeObjet)
                             self.ctrl_impression.MAJ()
                         self.MAJpageAffichee()
                         return
