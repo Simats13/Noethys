@@ -126,9 +126,9 @@ class CTRL_Parametres(wx.html.HtmlWindow):
             html += u"</UL>"
 
         # Options
-        
-        
-        
+        if self.dictParametres.get("exclure_archives", False) == True :
+            html += _(u"<U><B>Options :</B></U> Individus archivés ou effacés exclus")
+
         # Finalisation du html
         html = _(u"<html><head><title>Paramètres</title></head><body><FONT SIZE=-1>%s</FONT></body></html>") % html
         self.SetPage(html)

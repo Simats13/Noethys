@@ -203,6 +203,12 @@ def GetConditionActivites(dictParametres={}):
             conditionsActivites = str(tuple(dictParametres["listeActivites"]))
     return conditionsActivites
 
+def GetConditionArchives(dictParametres={}):
+    """ Renvoie la condition SQL d'exclusion des individus archivés/effacés (si l'option est cochée) """
+    if dictParametres.get("exclure_archives", False) == True :
+        return "AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))"
+    return ""
+
 def GetInfosActivites(DB=None, listeActivites=[]):
     """ Récupération des infos sur les activités souhaitées """
     if len(listeActivites) == 0 : conditionActivites = "()"

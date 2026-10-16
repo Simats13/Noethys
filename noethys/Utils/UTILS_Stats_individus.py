@@ -37,7 +37,8 @@ def GetComparatifNombre(DB, dictParametres) :
     # Recherche des paramètres
     date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
     conditionsActivites = MODELES.GetConditionActivites(dictParametres)
-    
+    conditionArchives = MODELES.GetConditionArchives(dictParametres)
+
     # Recherche des périodes de comparaison
     req = """SELECT MIN(date), MAX(date) 
     FROM consommations 
@@ -60,13 +61,15 @@ def GetComparatifNombre(DB, dictParametres) :
     indexPeriodeReference = 0
     index = 0
     for dictPeriode in listePeriodes :
-        req = """SELECT COUNT(IDindividu)
-        FROM consommations 
-        WHERE date>='%s' AND date<='%s' 
+        req = """SELECT COUNT(consommations.IDindividu)
+        FROM consommations
+        LEFT JOIN individus ON individus.IDindividu = consommations.IDindividu
+        WHERE date>='%s' AND date<='%s'
         AND consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        GROUP BY IDindividu
-        ;""" % (dictPeriode["date_debut"], dictPeriode["date_fin"], conditionsActivites)
+        %s
+        GROUP BY consommations.IDindividu
+        ;""" % (dictPeriode["date_debut"], dictPeriode["date_fin"], conditionsActivites, conditionArchives)
         DB.ExecuterReq(req)
         listeDonnees = DB.ResultatReq()
         nbreIndividus = len(listeDonnees)
@@ -172,6 +175,7 @@ def GetDictAges(DB, dictParametres, mode_tranches=False) :
     # Recherche des paramètres
     date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
     conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+    conditionArchives = MODELES.GetConditionArchives(dictParametres)
 
     from Data import DATA_Civilites
     dictCivilites = DATA_Civilites.GetDictCivilites()
@@ -184,17 +188,17 @@ def GetDictAges(DB, dictParametres, mode_tranches=False) :
         WHERE date>='%s' AND date<='%s' 
         AND consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+        %s
         GROUP BY individus.IDindividu
-        ;""" % (date_debut, date_fin, conditionsActivites)
+        ;""" % (date_debut, date_fin, conditionsActivites, conditionArchives)
     else:
         req = """SELECT individus.IDindividu, IDcivilite, date_naiss
         FROM individus
         LEFT JOIN inscriptions ON inscriptions.IDindividu = individus.IDindividu 
         WHERE inscriptions.statut='ok' AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+        %s
         GROUP BY individus.IDindividu
-        ;""" % conditionsActivites
+        ;""" % (conditionsActivites, conditionArchives)
         
     DB.ExecuterReq(req)
     listeDonnees = DB.ResultatReq()
@@ -425,6 +429,7 @@ def GetAnciennete(DB, dictParametres):
     # Recherche des paramètres
     date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
     conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+    conditionArchives = MODELES.GetConditionArchives(dictParametres)
     
     if dictParametres["mode"] != "presents" :
         return {}, []
@@ -435,9 +440,9 @@ def GetAnciennete(DB, dictParametres):
     WHERE date<='%s' 
     AND consommations.etat IN ('reservation', 'present')
     AND IDactivite IN %s
-    AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+    %s
     GROUP BY consommations.IDindividu
-    ;""" % (date_fin, conditionsActivites)
+    ;""" % (date_fin, conditionsActivites, conditionArchives)
         
     DB.ExecuterReq(req)
     listeDonnees = DB.ResultatReq()
@@ -534,6 +539,7 @@ def GetNombreInscritsPeriode(DB, dictParametres):
     # Recherche des paramètres
     date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
     conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+    conditionArchives = MODELES.GetConditionArchives(dictParametres)
 
     if conditionsActivites in ("", "()"):
         return 0
@@ -544,8 +550,8 @@ def GetNombreInscritsPeriode(DB, dictParametres):
         LEFT JOIN individus ON individus.IDindividu = consommations.IDindividu
         WHERE consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
-        ;""" % conditionsActivites
+        %s
+        ;""" % (conditionsActivites, conditionArchives)
     else:
         req = """SELECT COUNT(DISTINCT consommations.IDindividu)
         FROM consommations
@@ -553,8 +559,8 @@ def GetNombreInscritsPeriode(DB, dictParametres):
         WHERE date>='%s' AND date<='%s'
         AND consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
-        ;""" % (str(date_debut), str(date_fin), conditionsActivites)
+        %s
+        ;""" % (str(date_debut), str(date_fin), conditionsActivites, conditionArchives)
 
     DB.ExecuterReq(req)
     listeDonnees = DB.ResultatReq()
@@ -665,6 +671,7 @@ def GetInscriptionsActivitesEtTotal(DB, dictParametres):
 
     date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
     conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+    conditionArchives = MODELES.GetConditionArchives(dictParametres)
     if conditionsActivites in ("", "()"):
         return {}, 0
 
@@ -674,17 +681,17 @@ def GetInscriptionsActivitesEtTotal(DB, dictParametres):
         LEFT JOIN individus ON individus.IDindividu = consommations.IDindividu
         WHERE consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+        %s
         GROUP BY consommations.IDactivite
-        ;""" % conditionsActivites
+        ;""" % (conditionsActivites, conditionArchives)
 
         req_tot = """SELECT COUNT(DISTINCT consommations.IDindividu)
         FROM consommations
         LEFT JOIN individus ON individus.IDindividu = consommations.IDindividu
         WHERE consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
-        ;""" % conditionsActivites
+        %s
+        ;""" % (conditionsActivites, conditionArchives)
     else:
         req_act = """SELECT consommations.IDactivite, COUNT(DISTINCT consommations.IDindividu)
         FROM consommations
@@ -692,9 +699,9 @@ def GetInscriptionsActivitesEtTotal(DB, dictParametres):
         WHERE date>='%s' AND date<='%s'
         AND consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+        %s
         GROUP BY consommations.IDactivite
-        ;""" % (str(date_debut), str(date_fin), conditionsActivites)
+        ;""" % (str(date_debut), str(date_fin), conditionsActivites, conditionArchives)
 
         req_tot = """SELECT COUNT(DISTINCT consommations.IDindividu)
         FROM consommations
@@ -702,8 +709,8 @@ def GetInscriptionsActivitesEtTotal(DB, dictParametres):
         WHERE date>='%s' AND date<='%s'
         AND consommations.etat IN ('reservation', 'present')
         AND IDactivite IN %s
-        AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
-        ;""" % (str(date_debut), str(date_fin), conditionsActivites)
+        %s
+        ;""" % (str(date_debut), str(date_fin), conditionsActivites, conditionArchives)
 
     DB.ExecuterReq(req_act)
     dictAct = {}
@@ -834,6 +841,7 @@ class Texte_nombre_individus(MODELES.Texte):
         
         date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
         conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+        conditionArchives = MODELES.GetConditionArchives(dictParametres)
         
         # Recherche du nombre d'individus présents
         if dictParametres["mode"] == "presents" :
@@ -843,17 +851,17 @@ class Texte_nombre_individus(MODELES.Texte):
             WHERE date>='%s' AND date<='%s' 
             AND consommations.etat IN ('reservation', 'present')
             AND IDactivite IN %s
-            AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+            %s
             GROUP BY consommations.IDindividu
-            ;""" % (date_debut, date_fin, conditionsActivites)
+            ;""" % (date_debut, date_fin, conditionsActivites, conditionArchives)
         else :
             req = """SELECT COUNT(inscriptions.IDindividu)
             FROM inscriptions 
             LEFT JOIN individus ON individus.IDindividu = inscriptions.IDindividu
             WHERE inscriptions.statut='ok' AND IDactivite IN %s
-            AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+            %s
             GROUP BY inscriptions.IDindividu
-            ;""" % conditionsActivites
+            ;""" % (conditionsActivites, conditionArchives)
 
         DB.ExecuterReq(req)
         listeDonnees = DB.ResultatReq()
@@ -884,6 +892,7 @@ class Tableau_nombre_individus(MODELES.Tableau):
         # Recherche des paramètres
         date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
         conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+        conditionArchives = MODELES.GetConditionArchives(dictParametres)
 
         # Recherche du nombre d'individus présents
         if dictParametres["mode"] == "presents" :
@@ -893,17 +902,17 @@ class Tableau_nombre_individus(MODELES.Tableau):
             WHERE date>='%s' AND date<='%s' 
             AND consommations.etat IN ('reservation', 'present')
             AND IDactivite IN %s
-            AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+            %s
             GROUP BY IDactivite, consommations.IDindividu
-            ;""" % (date_debut, date_fin, conditionsActivites)
+            ;""" % (date_debut, date_fin, conditionsActivites, conditionArchives)
         else:
             req = """SELECT IDactivite, COUNT(inscriptions.IDindividu)
             FROM inscriptions 
             LEFT JOIN individus ON individus.IDindividu = inscriptions.IDindividu
             WHERE inscriptions.statut='ok' AND IDactivite IN %s
-            AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
+            %s
             GROUP BY IDactivite, inscriptions.IDindividu
-            ;""" % conditionsActivites
+            ;""" % (conditionsActivites, conditionArchives)
 
         # req = """
         # SELECT IDactivite, COUNT(IDindividu)

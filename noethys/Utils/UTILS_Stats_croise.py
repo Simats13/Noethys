@@ -149,6 +149,7 @@ class TableauCroiseDynamique(MODELES.Tableau):
 
         date_debut, date_fin = MODELES.GetDatesPeriode(dictParametres)
         conditionsActivites = MODELES.GetConditionActivites(dictParametres)
+        conditionArchives = MODELES.GetConditionArchives(dictParametres)
         if conditionsActivites in ("", "()"):
             return
 
@@ -198,8 +199,8 @@ class TableauCroiseDynamique(MODELES.Tableau):
                  WHERE consommations.date >= '%s' AND consommations.date <= '%s'
                  AND consommations.etat IN ('reservation', 'present')
                  AND consommations.IDactivite IN %s
-                 AND (individus.etat IS NULL OR individus.etat NOT IN ('archive', 'efface'))
-                 ;""" % (str(date_debut), str(date_fin), conditionsActivites)
+                 %s
+                 ;""" % (str(date_debut), str(date_fin), conditionsActivites, conditionArchives)
         
         DB.ExecuterReq(req)
         donnees = DB.ResultatReq()
