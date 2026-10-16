@@ -998,12 +998,8 @@ def AfficheStatsProgramme():
     print("Nbre tables de données = %d" % nbreTables)
 
 def GetRepertoireProjet(fichier=""):
-    frozen = getattr(sys, 'frozen', '')
-    if not frozen:
-        chemin = os.path.dirname(os.path.abspath(__file__))
-    else :
-        chemin = os.path.dirname(sys.executable)
-    return os.path.join(chemin, fichier)
+    import Chemins
+    return Chemins.GetMainPath(fichier)
 
 def GetVersionLogiciel():
     """ Recherche du numéro de version du logiciel """

@@ -14,7 +14,15 @@ frozen = getattr(sys, 'frozen', '')
 if not frozen:
     REP_COURANT = os.path.dirname(os.path.abspath(__file__))
 else :
-    REP_COURANT = os.path.dirname(sys.executable)
+    rep_exe = os.path.dirname(sys.executable)
+    if os.path.exists(os.path.join(rep_exe, "Static")):
+        REP_COURANT = rep_exe
+    elif hasattr(sys, '_MEIPASS') and os.path.exists(os.path.join(sys._MEIPASS, "Static")):
+        REP_COURANT = sys._MEIPASS
+    elif os.path.exists(os.path.join(rep_exe, "_internal", "Static")):
+        REP_COURANT = os.path.join(rep_exe, "_internal")
+    else:
+        REP_COURANT = rep_exe
 
 if REP_COURANT not in sys.path :
     sys.path.insert(1, REP_COURANT)
